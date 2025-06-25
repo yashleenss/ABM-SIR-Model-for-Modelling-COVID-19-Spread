@@ -1,24 +1,27 @@
-function [X, Y, H] = HealthStatus(N, NI, NRc, Lo)
-    % N: Total number of particles
-    % NI: Number of initially infected particles
-    % NRc: Number of recovered particles
-    % Lo: The length of one side of the boundary (particles randomly placed within 0 to Lo)
-    
-    % Total number of susceptible particles (excluding those recovered)
-      Ns = N - NRc;
+%--------------------------------------------------------%
+% Calculating the initial Health Status of each particle
+%--------------------------------------------------------%
 
-    % Initialize arrays to store the coordinates and health status
-      X = Lo * rand(N, 1);  % X-coordinates, random between 0 and Lo
-      Y = Lo * rand(N, 1);  % Y-coordinates, random between 0 and Lo
-      H = zeros(N, 1);      % Health status (0 for susceptible, 1 for infected)
+ function [H] = HealthStatus(N, NRc)
 
-    % Choose N1 particles to be initially infected from the first Ns1
-      infected_particles = randperm(Ns, NI);  % Randomly select N1 pasticles within Ns1
+    % N = Total number of particles
+    % NSI = Number of initially susceptible particles
+    % NI = Number of initially infected particles
+    % NRc = Number of recovered particles
+   
+    % Initialization
+      infection_rate = 0.01;        % independent variable
+      NI = round(N * infection_rate); 
+      NSI = N - NRc;
+      H = zeros(N, 1);      % Health status (0- susceptible, 1- infected)
 
-    % Set health status of selected particles to infected
+    % Choose NI particles to be initially infected from the first NSI
+      infected_particles = randperm(NSI, NI);  % randomly select particles
+      
+    % Set health status of selected particles to be infected
       H(infected_particles) = 1;
-
-    % The remaining particles are susceptible
-    % No need to explicitly set them to 0 because H is initialized with zeros
-
-end
+      
+    % The remaining particles are susceptible, H is initialized with zeros.
+    % No need to explicitly set them to 0.
+    
+ end
