@@ -24,8 +24,7 @@
   age_group(n_elderly+1:n_elderly+n_adults) = 2;
   age_group(n_elderly+n_adults+1:end) = 3;
 
-% Assign VE values based on thirds
-  
+% Initialization for independent run
   sum_H = zeros (N,1);
   sum_P_H = zeros(N, 1);
   VE_fixed = zeros(N, 1);                      
@@ -41,8 +40,8 @@
   Y = L * rand(N, 1);
 
 %-----------------------TIME SPAN VARIABLES-----------------% 
-% Number of days to simulate (for first outbreak = Day(1-90))
-  T_span = 90;              % from Dec.12,2020 to Mar.12,2021 
+% Number of days to simulate
+  T_span = 500;              % from Dec.12,2020 to Apr.22,2022 
 
 % Distinct estimated reproduction rate for each outbreak
   R_t_vector = zeros(T_span,1);
@@ -75,7 +74,7 @@
   sum_recovered = zeros(1,T_span);
 
 %---------------------VACCINE DISTRIBUTION----------------------%
-% Initialize VEdays and VElevel for first dose (Jan8 - Feb20)
+% Initialize VEdays and VElevel for all 3 vaccination campaigns
   VElevel = 0.9;                  % maximum VElevel is 90%
   VEdays = [7, 28, 150, 180];     % days after which VE changes
 
@@ -97,8 +96,8 @@
   raw = (normrnd(mu1, sigma1, [N,1])/2 + normrnd(mu2, sigma2, [N,1])/2);
   RecoveryTime = ceil(min(max(raw, 7), 21));
 
-% Adjusting natural duration by ~25 day mean, bounding to [30, 60] days 
-  ImmunityTime = ceil(min(max(raw + 25, 30), 60));
+% Adjusting natural duration by ~100 day mean, bounding to [90, 180] days 
+  ImmunityTime = ceil(min(max(raw + 100, 90), 180));
 
 %--------------------------RADII VARIABLES--------------------%  
 % Infection radii within which particles can infect each other
@@ -147,7 +146,7 @@
         infected_idx = find(H == 1);
         
       % Re-assign vaccination days for each group
-        Tv = Inf(N, 1);                        % initialize Tv
+        Tv = Inf(N, 3);                        % initialize Tv
 
       % First vaccination campaign Day 27 to Day 70
         vaccinated_elderly_1 = randsample(find(age_group == 1),...
@@ -160,7 +159,35 @@
                                                 num_adults_vaccinated, 1);
         Tv(n_elderly+n_adults+1:end, 1) = Inf; % kids are not vaccinated
 
-        Ti = Tv;                          % initialized recovery 
+      % Second vaccination campaign Day 91 to Day 207
+        vaccinated_elderly_2 = randsample(find(age_group == 1),...
+                                               num_elderly_vaccinated);
+        Tv(vaccinated_elderly_2, 2) = randi([91, 112],...
+                                               num_elderly_vaccinated, 1);
+        vaccinated_adults_2 = randsample(find(age_group == 2),...
+                                               num_adults_vaccinated);
+        Tv(vaccinated_adults_2, 2) = randi([113, 149],...
+                                               num_adults_vaccinated, 1);
+        vaccinated_kids_2 = randsample(find(age_group == 3),...
+                                               num_kids_vaccinated);
+        Tv(vaccinated_kids_2, 2) = randi([150, 207],...
+                                               num_kids_vaccinated, 1);
+      
+    % Third vaccination campaign Day 232 to Day 303
+        vaccinated_elderly_3 = randsample(find(age_group == 1),...
+                                               num_elderly_vaccinated);
+        Tv(vaccinated_elderly_3, 3) = randi([232, 253],...
+                                               num_elderly_vaccinated, 1);
+        vaccinated_adults_3 = randsample(find(age_group == 2),...
+                                               num_adults_vaccinated);
+        Tv(vaccinated_adults_3, 3) = randi([254, 284],...
+                                               num_adults_vaccinated, 1);
+        vaccinated_kids_3 = randsample(find(age_group == 3),...
+                                               num_kids_vaccinated);
+        Tv(vaccinated_kids_3, 3) = randi([285, 303],...
+                                               num_kids_vaccinated, 1);
+
+        Ti = Tv(:,1);                     % initialize recovery once
         Immunity = zeros(N,1);            % vaccine = 0 & recovery = 1
         VE = zeros(N, 1);
 
@@ -170,7 +197,7 @@
       %------------------------INFECTION STATE---------------------------%  
       % Initialize tI & random infection days ONLY to infected individuals
         tI = zeros(N,1);
-        tI(infected_idx) = randi([0, 90], length(infected_idx),1);
+        tI(infected_idx) = randi([0, 500], length(infected_idx),1);
         infection = zeros(1,N);
 
       %---------------------EXTRACTING RESULTS---------------------------%
