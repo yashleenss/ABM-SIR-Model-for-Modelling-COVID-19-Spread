@@ -1,42 +1,70 @@
-function VE = VaccineEffectiveness(Tv, t)
+%----------------------------------------------------------------%
+% Calculating Vaccine Effectiveness based on vaccination/recovery
+%----------------------------------------------------------------%
 
-% t1: denotes the first day since infection started (106)
-% Tv: indicates the day of immunization/vaccination for each particle
-% Initialize VEdays and VElevel
+function VE = VaccineEffectiveness(Ti, t, VElevel, VEdays, Immunity)
 
-  VElevel = 0.9; % Maximum VElevel is 90%
-  VEdays = [7, 28, 150, 180]; % Days after which VE changes
+% t1 = denotes the first day since infection started since Aug/28/2020
+% Ti = indicates the day of immunization/vaccination for each particle
+% (t-Ti) will compute the number of days since vaccination/immunization
    
 % First, check if the particle is unvaccinated (Tv should be infinity)
- if isinf(Tv)
-     VE = 0; % If unvaccinated, set VE=0
+  if Ti == Inf
+     VE = 0;   % if unvaccinated, set VE=0
      return;
- end
+  end
 
-% Compute vaccine effectiveness based on the days since vaccination
-% (t-Tv) will compute the number of days since vaccination
-    
-  if (t-Tv) <= VEdays(1)
-     VE = 0; % No effectiveness before first 7 days
+%-------------------IMMUNITY MODEL-----------------%
+% Compute VE decay based on the days since recovery
+
+  if Immunity == 1
+     if (t-Ti) < VEdays(2)  
+        VE = VElevel;
+
+     elseif (t-Ti) >= VEdays(2) && (t-Ti) < VEdays(4)
+         
+            % Linear decrease from 0.9% to 0.3% with -0.6/152 slope
+            m = (0.3 - VElevel) / (VEdays(4) - VEdays(2));
+            VE = m * ((t - Ti) - VEdays(2)) + VElevel;    
+     else
+           VE = 2 * (VElevel / 6);   % Maintain 30% after 180 days
+     end
+
   else
-      if isscalar(t-Tv) % If it's a single value, use scalar logical operators
-         if (t-Tv) > VEdays(1) && (t-Tv) <= VEdays(2) 
-             % Linear increase from 0% to 90% over the next 21 days   
-               VE = VElevel * ((t-Tv - VEdays(1)) / (VEdays(2) - VEdays(1)));
+
+%------------------VACCINATION MODEL------------------%      
+% Compute VE growth based on the days since vaccination
+
+  if (t-Ti) <= VEdays(1)
+     VE = 0; % No effectiveness before first 7 days
+
+  else
+      if isscalar(t-Ti) % for a single value, use scalar logical operators
+         if (t-Ti) > VEdays(1) && (t-Ti) <= VEdays(2) 
+
+         % Linear increase from 0% to 90% over the next 21 days   
+           VE = VElevel * (((t-Ti) - VEdays(1)) / (VEdays(3) - VEdays(2)));
+
          else
-             if (t-Tv) > VEdays(2) && (t-Tv) <= VEdays(3)
-                % VE remains at 90% until 150 days after 1 week of second dose
-                  VE = VElevel; % Maximum effectiveness between 28 and 150 days
+             if (t-Ti) > VEdays(2) && (t-Ti) <= VEdays(3)
+
+                % VE remains at 90% for 150 days after 1 week of second dose
+                % Maximum effectiveness between 28 and 150 days
+                  VE = VElevel;
+
              else
-                 if (t-Tv) > VEdays(3) && (t-Tv) <= VEdays(4)
+                 if (t-Ti) > VEdays(3) && (t-Ti) <= VEdays(4)
+
                     % Linear decrease from 90% to 30% over the next 180 days
-                      VE = VElevel * (1 - ((t-Tv - VEdays(3)) / (3 * (VEdays(4) - VEdays(3)))));
+                      VE = VElevel * (1 - (((t-Ti) - VEdays(3)) /...
+                           (3 * (VEdays(4) - VEdays(3)))));
                  else
-                     % Decline in VE after 180 days (should be 30% or/6)
-                       VE = 2 * (VElevel / 3); 
+                     % Maintain 30 % VE after 180 days
+                       VE = 2 * (VElevel / 6); 
                   end
               end
           end
       end 
   end
-end
+  end
+end 
