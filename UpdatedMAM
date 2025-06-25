@@ -138,6 +138,17 @@
                   infection(j) = 0;   
               end
           end
+        %------------------- NEW VACCINATION STATUS CHECK ------------------%
+          for dose = 1:3
+               % check for any new dose recieved at time t
+               newly_vaccinated = find (Tv(:, dose) == t); 
+               for j = newly_vaccinated
+                   if Immunity(j) = 1 
+                      Ti(j) = t;        % reset recovery day 
+                      Immunity(j) = 0;  % mark as vaccine-immunity
+                   end
+               end
+          end
 
   % Store the daily count /age group (susceptible, infected & recovered)
     daily_susceptible_logical = (H == 0); 
