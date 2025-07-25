@@ -23,13 +23,9 @@
   age_group(1:n_elderly) = 1;
   age_group(n_elderly+1:n_elderly+n_adults) = 2;
   age_group(n_elderly+n_adults+1:end) = 3;
+  
+%---------------------------- SIMULATION AREA ----------------------------%
 
-% Initialization for independent run
-  sum_H = zeros (N,1);
-  sum_P_H = zeros(N, 1);
-  VE_fixed = zeros(N, 1);                      
- 
-%-------------------------SIMULATION AREA------------------%
 % Initialize the length of the simulation area
   density = 0.663;          % initial density (particles/m^2)
   area = N / density;
@@ -39,9 +35,10 @@
   X = L * rand(N, 1);
   Y = L * rand(N, 1);
 
-%-----------------------TIME SPAN VARIABLES-----------------% 
-% Number of days to simulate
-  T_span = 500;              % from Dec.12,2020 to Apr.22,2022 
+%--------------------------- TIME SPAN VARIABLES -------------------------% 
+
+% Number of days to simulate (for first outbreak = Day(1-90))
+  T_span = 500;              % from Dec.12,2020 to Mar.12,2021 
 
 % Distinct estimated reproduction rate for each outbreak
   R_t_vector = zeros(T_span,1);
@@ -54,10 +51,6 @@
   daily_new_adults = zeros(1, T_span);
   daily_new_kids = zeros(1, T_span); 
 
-% Select a variant type to work with
-  variant = 'Alpha and Delta'; 
-  fprintf('Working with %s variant\n', variant); 
-
 % Preallocate to count daily infected cases across simulations
   sum_daily_elderly = zeros(1, T_span);
   sum_daily_adults = zeros(1, T_span);
@@ -68,13 +61,18 @@
   sum_avg_adults = zeros(1, T_span);
   sum_avg_kids = zeros(1, T_span);
 
-% Preallocate to store the no. of infected and susceptible a/c simulations
+% Preallocate to store the no. of individuals in each state
   sum_susceptible = zeros(1, T_span);
   sum_infected = zeros(1,T_span);
   sum_recovered = zeros(1,T_span);
+  sum_VE_infected = zeros(1, T_span);
+  sum_VE_all = zeros(1, T_span);
+  sum_H = zeros(N,1);
+  sum_P_H = zeros(N, 1);
 
-%---------------------VACCINE DISTRIBUTION----------------------%
-% Initialize VEdays and VElevel for all 3 vaccination campaigns
+%------------------------- VACCINE DISTRIBUTION --------------------------%
+
+% Initialize VEdays and VElevel for first dose (Jan8 - Feb20)
   VElevel = 0.9;                  % maximum VElevel is 90%
   VEdays = [7, 28, 150, 180];     % days after which VE changes
 
@@ -96,10 +94,18 @@
   raw = (normrnd(mu1, sigma1, [N,1])/2 + normrnd(mu2, sigma2, [N,1])/2);
   RecoveryTime = ceil(min(max(raw, 7), 21));
 
-% Adjusting natural duration by ~100 day mean, bounding to [90, 180] days 
+% Adjusting natural duration by ~25 day mean, bounding to [30, 60] days 
   ImmunityTime = ceil(min(max(raw + 100, 90), 180));
 
-%--------------------------RADII VARIABLES--------------------%  
+% Preallocation for different vaccination groups behavior
+  ngps = 3;
+  VE_fixed = [0.1, 0.9]; 
+  VE_group = zeros(N,1);
+  P_H_tspan = zeros(ngps, T_span);
+  sum_P_H_tspan = zeros(ngps, T_span);
+
+%------------------------------ RADII VARIABLES --------------------------%
+
 % Infection radii within which particles can infect each other
   infection_radii = 6;               
   radii_squared = infection_radii.^2;
@@ -114,7 +120,7 @@
 % Preallocate the array to avoid resizing
   plot_handles = gobjects(num_radii, 1);  
 
-%---------------------------VIDEO WRITER--------------------------%
+%-------------------------------- VIDEO WRITER ---------------------------%
 %{
 % Create an object for animation
   videoFilename = VideoWriter('particles_animation.mp4', 'MPEG-4');
@@ -123,30 +129,28 @@
   open(v);
 %}
 
-%------------RADIUS LOOP---------------%
+%----------------- RADIUS LOOP ------------------%
+
 % FOR Loop over radii (0:6)
   for r_idx = 1:num_radii
       radius = radii_squared; % Current radius
 
-% Initialize daily avergae vaccine effectivness array
-%  Avg_daily_VE = zeros(T_span,1);
-
-% Initialize average infection probability over the number of radii 
-  sum_P_H_over_radii = zeros(N,1);
   
-%-----------SIMULATION LOOP------------%  
+%--------------- SIMULATION LOOP ------------------%  
+
 % Define the number of simulations
-  num_simulations = 500;
+  num_simulations = 10;
   for sim = 1:num_simulations
 
-      %----------------------HEALTH STATUS-----------------------%
+      %--------------------------- HEALTH STATUS -------------------------%
+
       % Re-initialize health status: 1 for infected, 0 for healthy
         [H] = HealthStatus(N, NRc);
         susceptible_idx = find(H == 0);
         infected_idx = find(H == 1);
         
-      % Re-assign vaccination days for each group
-        Tv = Inf(N, 3);                        % initialize Tv
+      % Re-assign vaccination days for each age group
+        Tv = Inf(N, 1);   % initialize Tv
 
       % First vaccination campaign Day 27 to Day 70
         vaccinated_elderly_1 = randsample(find(age_group == 1),...
@@ -173,7 +177,7 @@
         Tv(vaccinated_kids_2, 2) = randi([150, 207],...
                                                num_kids_vaccinated, 1);
       
-    % Third vaccination campaign Day 232 to Day 303
+      % Third vaccination campaign Day 232 to Day 303
         vaccinated_elderly_3 = randsample(find(age_group == 1),...
                                                num_elderly_vaccinated);
         Tv(vaccinated_elderly_3, 3) = randi([232, 253],...
@@ -187,25 +191,24 @@
         Tv(vaccinated_kids_3, 3) = randi([285, 303],...
                                                num_kids_vaccinated, 1);
 
-        Ti = Tv(:,1);                     % initialize recovery once
+        Ti = Tv;                          % initialized recovery 
         Immunity = zeros(N,1);            % vaccine = 0 & recovery = 1
-        VE = zeros(N, 1);
+        VE = zeros(N, 1);                 % reinitialize each run
 
-      % Initialize storage for vaccination of individual at each time
-        VE_over_time = zeros(T_span, N); 
+      %----------------------- INFECTION STATE ---------------------------%
 
-      %------------------------INFECTION STATE---------------------------%  
       % Initialize tI & random infection days ONLY to infected individuals
         tI = zeros(N,1);
         tI(infected_idx) = randi([0, 500], length(infected_idx),1);
         infection = zeros(1,N);
 
-      %---------------------EXTRACTING RESULTS---------------------------%
-       results = MAM(N, L, H, X, Y, T_span, VE_over_time, VE,...
-                     RecoveryTime, VElevel, VEdays, Ti, tI,radius,...
-                     infection, age_group, variant, daily_new_elderly,...
-                     daily_new_adults, daily_new_kids, Immunity,...
-                     ImmunityTime, R_t_vector);
+      %--------------------- EXTRACTING RESULTS --------------------------%
+      
+       results = MAM(N, L, H, X, Y, T_span, Tv, Ti, tI, VE, VElevel,...
+                     VEdays, VE_fixed, ngps, age_group,...
+                     infection, radius, RecoveryTime, Immunity,...
+                     ImmunityTime, daily_new_elderly, R_t_vector,...
+                     daily_new_adults, daily_new_kids, P_H_tspan);
 
       % Accumulate the total infections per day 
         sum_daily_elderly = sum_daily_elderly + results.daily_new_elderly;
@@ -219,9 +222,11 @@
 
       % Accumulate the population dynamics 
         sum_susceptible = sum_susceptible + results.daily_susceptible_idx;
-        sum_infected = sum_infected + results.daily_infected_idx;
         sum_recovered = sum_recovered + results.daily_recovery_idx;
-        sum_P_H_over_radii = sum_P_H_over_radii + results.P_H ;
+        sum_infected = sum_infected + results.daily_infected_idx;
+        sum_VE_infected = sum_VE_infected + results.VE_infected;
+        sum_P_H_tspan = sum_P_H_tspan + results.P_H_tspan;
+        sum_VE_all = sum_VE_all + results.VE_all;
         sum_P_H = sum_P_H + results.P_H;
         sum_H = sum_H + results.H;
 
@@ -231,106 +236,80 @@
   num_infected_over_radii(:, r_idx) = sum_infected / num_simulations;
 
   end % end radii loop
+
+%-------------------------------------------------------------------------%
+%                             ANALYSIS TESTS
+%-------------------------------------------------------------------------%
+
+% [R G B] Color Palette 
+  light_blue = [0.1, 0.44, 0.9];
+  light_red = [0.95, 0.07, 0.09];
+  light_green = [0.37, 0.9, 0.18];
 %{
-% Test 10: Check How is vaccine distributed among individuals  
+% Test 1: How VE changes over time per particle (heat map)
+  Avg_VE_all = sum_VE_all / num_simulations;
+  Avg_VE_infected = sum_VE_infected / num_simulations;
   figure;
-  histogram(Tv(isfinite(Tv)), 90);
-  xlabel('Vaccination Day');
-  ylabel('Total number of individuals');
-  title('Distribution of First vaccination dose');
-  
-% Add vertical lines on major dates
-  xline(28, '--k','HandleVisibility', 'off');
-  xline(71, '--k','HandleVisibility', 'off');
-
-% X-axis ticks for 1st day of each vacccination campaign 
-  xticks([1 28 71 90])
-  xticklabels({'Dec,12,2020','Jan 8', 'Feb 20','Mar,12,2021'})
-  grid on;
-
-% Test 9: To see how VE changes over time per particle (heat map)
-  Avg_VE = mean(VE_over_time, 2); % mean along the second dimension (columns),  
-  figure;
-  plot(1:T_span, Avg_VE * 100);  % Convert VE to percentage
+  plot(1:T_span, Avg_VE_all, 'b-', 'LineWidth', 2); 
+  hold on;
+  plot(1:T_span, Avg_VE_infected, 'r-', 'LineWidth', 2);
   xlabel('Time (days)');
-  ylabel('Average Vaccine Effectiveness (%)');
-  title('Evoultion of Vaccine Effectiveness Over Time');
+  ylabel('Average Vaccine Effectiveness (radius = 6cm)');
+  title('Evoultion of Vaccine Effectiveness Over Time (500 runs)');
+  legend({'All Individuals', 'Infected'}, 'Location', 'best');
 
 % Add vertical lines on major dates
   xline(28, '--k','HandleVisibility', 'off');
-  xline(71, '--k','HandleVisibility', 'off');
-
-% X-axis ticks for 1st day of each vacccination campaign 
-  xticks([1 28 71 90])
-  xticklabels({'Dec,12,2020','Jan 8', 'Feb 20','Mar,12,2021'})
+  xline(91, '--k','HandleVisibility', 'off');
+  xline(232, '--k','HandleVisibility', 'off');
   grid on;
   hold off;
   
-% Test 8: Average VE for all N particles at each time step  
-  figure;
-  plot(1:T_span, Avg_daily_VE * 100, 'b', 'LineWidth', 2);
-  xlabel('Time (days)');
-  ylabel('Average Vaccine Effectiveness');
-  title('Trend of Average Vaccine Effectiveness Over Time');
-  grid on;
-
-% Test 7: Number of infected individuals vs Time Steps (for each radii)
+% Test 2: Number of infected individuals vs Time Steps (for each radii)
   figure;
   hold on;
   colors = lines(num_radii); % Generate distinct colors for each line
   
   for r_idx = 1:num_radii
       
-      % Plot infection data for the current radius
-        plot_handles(r_idx) = plot(1:T_span, num_infected_over_radii(:, r_idx),...
-                            'o-','LineWidth', 2,'Color', colors(r_idx, :),...
-                            'DisplayName', sprintf('Radius = %d',...
-                             infection_radii(r_idx)));
+     % Plot infection data for the current radius
+       plot_handles(r_idx) = plot(1:T_span,...
+                                  num_infected_over_radii(:, r_idx),...
+                                  'o-','LineWidth', 2,'Color',...
+                                  colors(r_idx, :),'DisplayName',...
+                                  sprintf('Radius = %d',...
+                                  infection_radii(r_idx)));
   end
 
 % Add vertical lines on major dates
-  xline(28, '--k', 'HandleVisibility','off');
-  xline(71, '--k', 'HandleVisibility','off');
+ % xline(28, '--k', 'HandleVisibility','off');
+ % xline(71, '--k', 'HandleVisibility','off');
   xlabel('Time (days)');
   ylabel('Mean Number of Infected Individuals (500 simulations)');
-  title('Disease Dynamics w.r.t Different Radii (1,3,6)cm');
+  title('Disease Dynamics w.r.t Different Radii (0,1,3,6)cm');
   legend(plot_handles, 'Location', 'Best');
   set(gca,'FontSize',10,'FontName','Times');
   grid on;
   hold off;
 
-% Separate infection probability by Groups
-  P_H = sum_P_H / num_simulations;
-  infected_group1 = mean(P_H(VE_group == 1));
-  infected_group2 = mean(P_H(VE_group == 2));
-  infected_group3 = mean(P_H(VE_group == 3));
- 
-  infected_group1 = sum(H(VE_group == 1)) / sum(VE_group == 1);
-  infected_group2 = sum(H(VE_group == 2)) / sum(VE_group == 2);
-  infected_group3 = sum(H(VE_group == 3)) / sum(VE_group == 3);
+% Test 3: Mean infection probability by different VE Groups
+  avg_P_H_tspan = sum_P_H_tspan / num_simulations;
+  figure; 
+  hold on;
+  colors = [light_blue; light_red; light_green];
 
-% Display infection proportions for each group
-  disp(['Proportion Infected (VE >= 90%): ', num2str(infected_group1)]);
-  disp(['Proportion Infected (10% <= VE < 90%): ', num2str(infected_group2)]);
-  disp(['Proportion Infected (VE < 10%): ', num2str(infected_group3)]);
-
-% Test 6: Different VE Scenarios
-  figure;
-  bar([1, 2, 3], [infected_group1, infected_group2, infected_group3],...
-                   'FaceColor', 'flat');
-  xticks([1, 2, 3]);
-  xticklabels({'VE >= 90%', '10% <= VE < 90%', 'VE < 90%'});
-  ylabel('Average Infection Proportion across 500 simulations','FontSize',12);
-  title('Comparison of Infection Proportions by Vaccine Effectiveness',...
-       'FontSize',12);
+  for i = 1:ngps
+      plot(1:T_span, avg_P_H_tspan(i,:), 'Color', colors(i,:),...
+                                         'LineWidth', 2);
+  end
+  xlabel('Time (days)');
+  ylabel('Mean Infection Probability With total population (500 runs)');
+  legend({'Group 1 (< 0.1)','Group 2 (0.1-0.9)','Group 3 (≥ 0.9)'});
+  title('Mean Infection Behavior with Three VE groups (Radius = 6cm)');
   grid on;
-%}
-% [R G B] Color Palette 
-  light_blue = [0.1, 0.44, 0.9];
-  light_red = [0.95, 0.07, 0.09];
-  light_green = [0.37, 0.9, 0.18];
+  hold off;
 
-% Test 5: Daily new infected cases w.r.t. age groups
+% Test 4: Daily new infected cases w.r.t. age groups
   figure;
   plot(1:T_span, sum_daily_kids/num_simulations, '-^', 'Color',...
       light_blue, 'LineWidth', 2, 'MarkerSize', 3,...
@@ -343,7 +322,7 @@
        light_green, 'LineWidth', 2.5, 'MarkerSize', 5,...
        'MarkerFaceColor', light_green); 
 
-  xlabel('Time (date)','FontSize', 12);
+  xlabel('Time (days)','FontSize', 12);
   ylabel('Number of New Infections per day','FontSize', 12);
   title('Daily Confirmed Cases for First Outbreak (Radius = 6 cm)',...
         'FontSize', 12);
@@ -359,8 +338,11 @@
 
 % Add vertical lines on major dates
   xline(28, '--k', 'HandleVisibility','off');
-  xline(71, '--k', 'HandleVisibility','off');
+  xline(91, '--k', 'HandleVisibility','off');
+  xline(232, '--k', 'HandleVisibility','off');
   yLimits = ylim;
+  grid on;
+  hold off;
 
 % Light Grey Patch for vaccination campaign
   fill([28 71 71 28], [yLimits(1) yLimits(1) yLimits(2) yLimits(2)],...
@@ -371,7 +353,7 @@
   grid on;
   hold off;
 
-% Test 4: Total number of susceptible, infected & recovered individuals
+% Test 5: Total number of susceptible, infected & recovered individuals
   figure;
   plot(1:T_span, sum_susceptible/num_simulations, '-', 'Color',...
       light_blue, 'LineWidth', 2, 'MarkerSize', 3,...
@@ -395,13 +377,15 @@
        round(max_infected)),'FontSize', 10,...
        'FontWeight', 'bold','Color', 'black');
 
-  xlabel('Time (date)','FontSize', 12);
+  xlabel('Time (days)','FontSize', 12);
   ylabel('Mean Number of Individuals','FontSize', 12);
   title('Temporal Dynamics of COVID-19 Transmission (Radius = 6 cm)',...
         'FontSize', 12);
   legend({'Susceptible', 'Infected','Recovered'},'Location',...
          'northeast', 'FontSize', 10);
   set(gca, 'FontSize', 10, 'LineWidth', 1);
+  grid on;
+  hold off;
 
 % Custom X-axis date ticks
   start_date = datetime(2020,12,12);
@@ -411,8 +395,11 @@
 
 % Add vertical lines on major dates
   xline(28, '--k', 'HandleVisibility','off');
-  xline(71, '--k', 'HandleVisibility','off');
+  xline(91, '--k', 'HandleVisibility','off');
+  xline(232, '--k', 'HandleVisibility','off');
   yLimits = ylim;
+  grid on;
+  hold off;
 
 % Light Grey Patch for vaccination campaign
   fill([28 71 71 28], [yLimits(1) yLimits(1) yLimits(2) yLimits(2)],...
@@ -422,8 +409,8 @@
        'FontSize', 10, 'Color', [0.3 0.3 0.3])
   grid on;
   hold off;
-%{
-% Test 3: Average P_H per group over Tspan across simulations
+
+% Test 6: Average P_H per group over Tspan across simulations
   figure;
   plot(1:T_span, sum_avg_elderly/num_simulations, '-o', 'Color',...
       light_red, 'LineWidth', 2, 'MarkerSize', 3,...
@@ -436,20 +423,16 @@
       light_blue, 'LineWidth', 2, 'MarkerSize', 3,...
       'MarkerFaceColor', light_blue);  
     
-  title('Spatial Infection Probability in One Infected Particle', 'FontSize', 12);
+  title('Mean Infection Behavior with three age groups (Radius = 6cm)', 'FontSize', 12);
   xlabel('Time (Days)', 'FontSize', 12);
   ylabel('Mean Probability of getting infection (500 simulations)', 'FontSize', 12);
   legend({'Elderly (60+)', 'Adults (12-59)','Kids (0-11)'},...
       'Location', 'best', 'FontSize', 10);     
   set(gca, 'FontSize', 10, 'LineWidth', 1);
-
-% Add vertical lines on major dates
-  xline(28, '--k','HandleVisibility', 'off');
-  xline(71, '--k','HandleVisibility', 'off');
   grid on;
   hold off;
 
-% Test 2: Capture the frame
+% Test 8: Capture the frame
   frame = getframe(gcf);
   writeVideo(v, frame);
   end
@@ -457,7 +440,7 @@
 % Close the video file
   close(v);
 
-% Test 1: Scatter Plot of the final positions and infection status
+% Test 9: Scatter Plot of the final positions and infection status
   figure;
   gscatter(X, Y, H,[dark_green; dark_red], 'ox');
   title('Individual Agent Position and Infection Status',...
