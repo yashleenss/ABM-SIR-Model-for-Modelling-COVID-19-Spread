@@ -2,7 +2,7 @@
 %         MAM Algorithm for calculating the infection probability
 %-------------------------------------------------------------------------%
 
-  function results = MAM(N, L, H, X, Y, T_span, Tv, Ti, tI, VE, VElevel,...
+ function results = MAM(N, L, H, X, Y, T_span, Tv, Ti, tI, VE, VElevel,...
                      VEdays, VE_fixed, ngps, age_group,...
                      infection, radius, RecoveryTime, Immunity,...
                      ImmunityTime, daily_new_elderly, R_t_vector,...
@@ -15,8 +15,10 @@
 
            % Initialize storage vectors for time-evolving probabilities 
              P_H0 = zeros(N, T_span);
-             VE_all = zeros(1, T_span);       % Avg VE for N population
-             VE_infected = zeros(1, T_span);  % Avg VE among infected only
+             VE_all = zeros(1, T_span);
+             VE_infected = zeros(1, T_span);  
+             VE_recovery = zeros (1, T_span);
+             VE_susceptible = zeros (1, T_span);
 
   % Loop through each day to update positions and check infections 
     for t = 1:T_span
@@ -80,7 +82,7 @@
 
 %------------------------ INFECTION PROBABILITY CHECK --------------------%
 % Begin by checking the health status for each particle
-
+   
    for i = 1:N
 
      % Check if particle i is vaccinated and update VE
@@ -135,18 +137,19 @@
              if xi < P_H(i) && H(i) == 0 
                  H(i) = 1;         % mark these particle as infected            
                  tI(i) = t;        % reset infection day 
-                 VE(i) = 0;        % reset no vaccine effectiveness
+                 VE(i) = 0;          % reset no vaccine effectiveness
                  infection(i) = 1; % reset the particle to be infectious
              end
        end
    end
            
-  % Store the daily count /age group (susceptible, infected & recovered)
+  % Store the daily count / age group (susceptible, infected & recovered)
     daily_susceptible_logical = (H == 0); 
     daily_susceptible_idx(t) = sum (daily_susceptible_logical);
-
+    
     daily_infected_logical = (H == 1);   % (N*1) array vector
     daily_infected_idx(t) = sum(daily_infected_logical);  % scalar
+    VE(daily_infected_logical) = 0;
 
     daily_new_elderly(t) = sum(daily_infected_logical & (age_group == 1));
     daily_new_adults(t) = sum(daily_infected_logical & (age_group == 2));
@@ -165,27 +168,45 @@
 
        % fraction of individuals in VE group i who are infected 1
          P_H_tspan(i,t) = mean(H(VE_group==i)==1);
+     
    end
 
- % Avergae vaccine effectiveness over all N individuals at time t
+ % Avergae VE for all N individuals at each time step t
    VE_all(t) = mean(VE);
-   
- % Average vaccine effectiveness only for infected individuals at time t
+
+ % Average vaccine effectiveness for each state per individual at time t
+ % VE for infected population
     if any(daily_infected_logical)
        VE_infected(t) = mean(VE(daily_infected_logical));
     else
-       VE_infected(t)=0;
+       VE_infected(t) = 0;
     end
-
+    
+% VE for susceptible population
+    if any(daily_susceptible_logical)
+       VE_susceptible(t) = mean(VE(daily_susceptible_logical));
+    else
+       VE_susceptible(t) = 0;
+    end
+    
+% VE for recovered population
+    if any(daily_recovery_logical)
+       VE_recovery(t) = mean(VE(daily_recovery_logical));
+    else
+       VE_recovery(t) = 0;
+    end
+    
      end % end time span loop 
 
   % Store the results from each unique run
     results.H = H;
     results.P_H = P_H;
     results.Avg = Avg;
-    results.VE_all = VE_all;
+    results.VE_all = VE_all;  
     results.P_H_tspan = P_H_tspan;
     results.VE_infected = VE_infected;
+    results.VE_recovery = VE_recovery;
+    results.VE_susceptible = VE_susceptible;
     results.daily_new_kids = daily_new_kids;
     results.daily_new_adults = daily_new_adults;
     results.daily_new_elderly = daily_new_elderly;
