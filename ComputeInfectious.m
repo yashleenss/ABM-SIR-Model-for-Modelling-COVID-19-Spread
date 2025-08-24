@@ -1,6 +1,6 @@
-%-----------------------------------------------------%
-% Calculating the initial infection period and variant
-%-----------------------------------------------------%
+%-------------------------------------------------------------------------%
+%    Calculating the initial infection period and variant type
+%-------------------------------------------------------------------------%
 
 function infection = ComputeInfectious(tI, t, variant)
 
