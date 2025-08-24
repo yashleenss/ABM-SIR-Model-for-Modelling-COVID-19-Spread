@@ -30,9 +30,7 @@ function VE = VaccineEffectiveness(Ti, t, VElevel, VEdays, Immunity)
      else
             % Maintain ~60% after 180 days for Alpha and Delta variant
             % maintain ~30% after 180 days for Omicron variant
-              VE = (VElevel / 3);  
-
-            
+              VE = (VElevel / 3);       
      end
 
 %---------------------------- VACCINATION MODEL --------------------------% 
