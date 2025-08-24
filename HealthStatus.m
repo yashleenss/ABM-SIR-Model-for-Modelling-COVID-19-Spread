@@ -1,6 +1,6 @@
-%--------------------------------------------------------%
-% Calculating the initial Health Status of each particle
-%--------------------------------------------------------%
+%-------------------------------------------------------------------------%
+%         Calculating the initial Health Status of each particle
+%-------------------------------------------------------------------------%
 
  function [H] = HealthStatus(N, NRc)
 
@@ -10,10 +10,10 @@
     % NRc = Number of recovered particles
    
     % Initialization
-      infection_rate = 0.01;        % independent variable
+      infection_rate = 0.01; % independent variable
       NI = round(N * infection_rate); 
       NSI = N - NRc;
-      H = zeros(N, 1);      % Health status (0- susceptible, 1- infected)
+      H = zeros(N, 1);      % Health status (0: susceptible, 1; infected)
 
     % Choose NI particles to be initially infected from the first NSI
       infected_particles = randperm(NSI, NI);  % randomly select particles
