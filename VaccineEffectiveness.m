@@ -1,6 +1,6 @@
-%----------------------------------------------------------------%
-% Calculating Vaccine Effectiveness based on vaccination/recovery
-%----------------------------------------------------------------%
+%-------------------------------------------------------------------------%
+%    Calculating Vaccine Effectiveness based on vaccination/recovery
+%-------------------------------------------------------------------------%
 
 function VE = VaccineEffectiveness(Ti, t, VElevel, VEdays, Immunity)
 
@@ -14,27 +14,31 @@ function VE = VaccineEffectiveness(Ti, t, VElevel, VEdays, Immunity)
      return;
   end
 
-%-------------------IMMUNITY MODEL-----------------%
-% Compute VE decay based on the days since recovery
+%------------------------------ IMMUNITY MODEL ---------------------------%
 
   if Immunity == 1
+
+    % Compute VE decay based on natural infection (decay model)
      if (t-Ti) < VEdays(2)  
         VE = VElevel;
 
-     elseif (t-Ti) >= VEdays(2) && (t-Ti) < VEdays(4)
+     elseif (t-Ti) > VEdays(2) && (t-Ti) <= VEdays(4)
          
             % Linear decrease from 0.9% to 0.3% with -0.6/152 slope
-            m = (0.3 - VElevel) / (VEdays(4) - VEdays(2));
-            VE = m * ((t - Ti) - VEdays(2)) + VElevel;    
+              m = (0.3 - VElevel) / (VEdays(4) - VEdays(2));
+              VE = m * ((t - Ti) - VEdays(2)) + VElevel;    
      else
-           VE = 2 * (VElevel / 6);   % Maintain 30% after 180 days
+            % Maintain ~60% after 180 days for Alpha and Delta variant
+            % maintain ~30% after 180 days for Omicron variant
+              VE = (VElevel / 3);  
+
+            
      end
 
+%---------------------------- VACCINATION MODEL --------------------------% 
   else
 
-%------------------VACCINATION MODEL------------------%      
-% Compute VE growth based on the days since vaccination
-
+% Compute VE growth based on vaccination (growth model)
   if (t-Ti) <= VEdays(1)
      VE = 0; % No effectiveness before first 7 days
 
@@ -48,19 +52,22 @@ function VE = VaccineEffectiveness(Ti, t, VElevel, VEdays, Immunity)
          else
              if (t-Ti) > VEdays(2) && (t-Ti) <= VEdays(3)
 
-                % VE remains at 90% for 150 days after 1 week of second dose
-                % Maximum effectiveness between 28 and 150 days
-                  VE = VElevel;
+               % VE remains at 90% for 150 days after 1 week of second dose
+               % Maximum effectiveness between 28 and 150 days
+                 VE = VElevel;
 
              else
                  if (t-Ti) > VEdays(3) && (t-Ti) <= VEdays(4)
 
-                    % Linear decrease from 90% to 30% over the next 180 days
-                      VE = VElevel * (1 - (((t-Ti) - VEdays(3)) /...
+                   % Linear decrease from 90% to 30% over the next 180 days
+                     VE = VElevel * (1 - (((t-Ti) - VEdays(3)) /...
                            (3 * (VEdays(4) - VEdays(3)))));
                  else
-                     % Maintain 30 % VE after 180 days
-                       VE = 2 * (VElevel / 6); 
+               
+                 % Maintain ~60% after 180 days for Alpha and Delta variant
+                 % maintain ~30% after 180 days for Omicron variant
+                     VE = (VElevel / 3); 
+
                   end
               end
           end
@@ -68,3 +75,4 @@ function VE = VaccineEffectiveness(Ti, t, VElevel, VEdays, Immunity)
   end
   end
 end 
+
