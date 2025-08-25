@@ -2,7 +2,7 @@
 %         MAM Algorithm for calculating the infection probability
 %-------------------------------------------------------------------------%
 
- function results = MAM(N, L, H, X, Y, T_span, Tv, Ti, tI, VE, VElevel,...
+  function results = MAM(N, L, H, X, Y, T_span, Tv, Ti, tI, VE, VElevel,...
                      VEdays, VE_fixed, ngps, age_group,...
                      infection, radius, RecoveryTime, Immunity,...
                      ImmunityTime, daily_new_elderly, R_t_vector,...
@@ -87,7 +87,7 @@
 
      % Check if particle i is vaccinated and update VE
        VE(i) = VaccineEffectiveness(Ti(i), t, VElevel,VEdays, Immunity(i));
-
+      
      % If the particle is healthy (H=0)
        if H(i) == 0 
            P_H(i) = 0;     % default infection probability
@@ -111,7 +111,7 @@
                    % Check the infection radius 
                      if distance <= radius
                         exp_term = exp(-distance / (2 * (sigma_r)^2));
-                    
+
                      % Infection day for each infected particle
                        infection(j) = ComputeInfectious(tI(j),t, variant);
 
@@ -142,8 +142,8 @@
              end
        end
    end
-           
-  % Store the daily count / age group (susceptible, infected & recovered)
+          
+  % Daily count of susceptible, infected & recovered per age group
     daily_susceptible_logical = (H == 0); 
     daily_susceptible_idx(t) = sum (daily_susceptible_logical);
     
@@ -151,6 +151,7 @@
     daily_infected_idx(t) = sum(daily_infected_logical);  % scalar
     VE(daily_infected_logical) = 0;
 
+  % Daily infected cases per age group 
     daily_new_elderly(t) = sum(daily_infected_logical & (age_group == 1));
     daily_new_adults(t) = sum(daily_infected_logical & (age_group == 2));
     daily_new_kids(t) = sum(daily_infected_logical & (age_group == 3));
@@ -162,7 +163,7 @@
     P_H0(:,t) = P_H;
     Avg = Average(age_group, P_H0);
 
- % Separate VE groups (1,2,3) and store their H values
+ % Separate fixed VE stratified groups and store their H values
    VE_group = discretize(VE, [-Inf, VE_fixed, Inf]);
    for i = 1:ngps
 
@@ -171,40 +172,39 @@
      
    end
 
- % Avergae VE for all N individuals at each time step t
+ % Avergae VE for all N individuals for different varaints at time t
    VE_all(t) = mean(VE);
 
- % Average vaccine effectiveness for each state per individual at time t
- % VE for infected population
+ % Average vaccine effectiveness only for infected individuals at time t
     if any(daily_infected_logical)
        VE_infected(t) = mean(VE(daily_infected_logical));
     else
        VE_infected(t) = 0;
     end
     
-% VE for susceptible population
+  % Average vaccine effectiveness for susceptible individuals at time t
     if any(daily_susceptible_logical)
        VE_susceptible(t) = mean(VE(daily_susceptible_logical));
     else
        VE_susceptible(t) = 0;
     end
     
-% VE for recovered population
+  % Average vaccine effectiveness for recoevered individuals at time t
     if any(daily_recovery_logical)
        VE_recovery(t) = mean(VE(daily_recovery_logical));
     else
        VE_recovery(t) = 0;
     end
-    
-     end % end time span loop 
 
-  % Store the results from each unique run
+     end % end time span loop 
+ 
+  % Store the results in each time step for every independent run  
     results.H = H;
     results.P_H = P_H;
     results.Avg = Avg;
-    results.VE_all = VE_all;  
+    results.VE_all = VE_all;
     results.P_H_tspan = P_H_tspan;
-    results.VE_infected = VE_infected;
+    results.VE_infected = VE_infected; 
     results.VE_recovery = VE_recovery;
     results.VE_susceptible = VE_susceptible;
     results.daily_new_kids = daily_new_kids;
@@ -213,9 +213,10 @@
     results.daily_infected_idx = daily_infected_idx;
     results.daily_recovery_idx = daily_recovery_idx;
     results.daily_susceptible_idx = daily_susceptible_idx;
+  
   end 
 
-  % Select a variant type to based on the time span
+  % Define the variant type based on the time span of diseaset
     function variant = variant_type(t)
               if t >= 450
                     variant = 'Omicron';
