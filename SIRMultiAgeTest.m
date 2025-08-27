@@ -4,7 +4,7 @@
 
 % Initialize variables 
   N = 5000;                       % total number of particles
-  NR = [0; 0; 0];                 % recovered particles per age group
+  NRC = [0; 0; 0];                 % recovered particles per age group
   T_span = linspace(0, 89, 90);   % simulation duration time
   I_period = 7;                  % duration of infectious period
   infection_rate = 0.01;          % independent variable
@@ -15,7 +15,7 @@
   Re = [1.3; 0.85; 0.6];          % Kids, Adults, Elderly
 
 % Run the SIR simulation
-  [t, S, I, R] = SIRMultiAge(N, I0, NR, Re, X, T_span, I_period);
+  [t, S, I, R] = SIRMultiAge(N, I0, NRC, Re, X, T_span, I_period);
 
 % -------------------------- RESULT ANALYSIS -----------------------------%
 
