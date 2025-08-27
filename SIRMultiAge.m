@@ -2,16 +2,16 @@
 %               SIR Compartmental Age-Structured Model
 %-------------------------------------------------------------------------%
 
-function [t, S, I, R] = SIRMultiAge(N, I0, NR, Re, X, T_span, I_period)
+function [t, S, I, R] = SIRMultiAge(N, I0, NRC, Re, X, T_span, I_period)
 
          % Number of distinct groups (age groups)
            n = numel(X);
     
          % Define initial conditions for each age group
            NI = I0 .* X ;       % Initial infected per group
-           NR = NR .* X ;       % Initial recovered per group
-           NS = N - NI - NR;    % Initial susceptible per group
-           Y0 = [NS; NI; NR];   % Initial conditions t solve dydt
+           NRC = NRC .* X ;       % Initial recovered per group
+           NSI = N - NI - NRC;    % Initial susceptible per group
+           Y0 = [NSI; NI; NRC];   % Initial conditions t solve dydt
      
          % Define the differential equations
            function dydt = SIR_eq(~, Y)
